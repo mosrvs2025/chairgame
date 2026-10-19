@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CHAIRGAME // SIT ON ME — Tactical Sentient Furniture Action</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="three-canvas"></canvas>
+
+    <!-- SCREEN FLASH & VIGNETTE OVERLAYS -->
+    <div id="vignette-overlay"></div>
+    <div id="flash-overlay"></div>
+    <div id="world-labels-container"></div>
+
+    <!-- TOP HUD BAR -->
+    <header id="hud-top" class="hud-hidden">
+      <!-- Left: Mission Objectives & Stage Info -->
+      <div class="hud-panel mission-panel">
+        <div class="panel-header">
+          <span class="badge" id="hud-level-badge">ACT I</span>
+          <h2 id="hud-level-title">BEAN &amp; BONE CAFÉ</h2>
+        </div>
+        <div class="quota-bar-wrap">
+          <div class="quota-labels">
+            <span>SIT QUOTA HARVESTED</span>
+            <span id="hud-quota-text">0 / 6 SITS</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="hud-quota-fill" style="width: 0%"></div>
+          </div>
+        </div>
+        <ul id="hud-objectives-list" class="objectives-list"></ul>
+      </div>
+
+      <!-- Center: Stealth Eye & Boss Bar -->
+      <div class="hud-center-stack">
+        <div id="stealth-indicator" class="stealth-box state-safe">
+          <div class="eye-icon" id="stealth-eye-icon">
+            <svg viewBox="0 0 64 40" width="44" height="28">
+              <path class="eye-outer" d="M4 20 Q32 -6 60 20 Q32 46 4 20 Z" fill="none" stroke="currentColor" stroke-width="4"/>
+              <circle class="eye-pupil" id="stealth-pupil" cx="32" cy="20" r="8" fill="currentColor"/>
+            </svg>
+          </div>
+          <div class="stealth-info">
+            <div class="stealth-status-label" id="stealth-status-text">INCOGNITO // FURNITURE BLEND</div>
+            <div class="suspicion-track">
+              <div class="suspicion-fill" id="suspicion-bar-fill" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Boss Sitter Alert Bar -->
+        <div id="boss-hud" class="boss-bar-container hidden">
+          <div class="boss-header">
+            <span class="boss-tag">VIP BOSS SITTER</span>
+            <span id="boss-name">BARON VON ESPRESSO</span>
+            <span id="boss-sits-remaining">0 / 2 INTERCEPTS</span>
+          </div>
+          <div class="boss-track">
+            <div class="boss-fill" id="boss-bar-fill" style="width: 100%"></div>
+          </div>
+        </div>
+
+        <!-- Active Sit Siphon / Catapult Prompt -->
+        <div id="active-sitter-panel" class="active-sitter-panel hidden">
+          <div class="sitter-banner">
+            <span id="active-sitter-name">PATRON SITTING ON YOU!</span>
+            <span id="active-sitter-mode-tag" class="mode-tag siphon">SIPHONING COMFORT</span>
+          </div>
+          <div class="siphon-progress-track">
+            <div id="active-siphon-fill" class="siphon-progress-fill" style="width: 0%"></div>
+          </div>
+          <div class="sitter-controls-hint">
+            <span>Hold still to complete <b>Full Sit Harvest</b></span>
+            <span>OR Press <kbd>Q</kbd> / <kbd>R</kbd> to <b>CATAPULT SITTER!</b></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Radar Minimap & Score/Combo/Currency -->
+      <div class="hud-right-stack">
+        <div class="hud-panel score-panel">
+          <div class="score-row">
+            <div>
+              <div class="stat-label">SCORE</div>
+              <div class="stat-value" id="hud-score">0</div>
+            </div>
+            <div class="combo-box" id="hud-combo-box">
+              <span class="combo-mult" id="hud-combo">x1.0</span>
+              <span class="combo-sub" id="hud-combo-label">STREAK</span>
+            </div>
+            <div>
+              <div class="stat-label">GLUTE GOLD</div>
+              <div class="stat-value gold" id="hud-coins">0 🪙</div>
+            </div>
+          </div>
+          <div class="integrity-row">
+            <div class="integrity-labels">
+              <span>CHAIR STRUCTURAL INTEGRITY</span>
+              <span id="hud-health-text">100%</span>
+            </div>
+            <div class="integrity-track">
+              <div class="integrity-fill" id="hud-health-fill" style="width: 100%"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="radar-wrap">
+          <canvas id="radar-canvas" width="168" height="168"></canvas>
+          <div class="radar-legend">
+            <span><i class="dot dot-sit"></i>Sit Target</span>
+            <span><i class="dot dot-rival"></i>Rival</span>
+            <span><i class="dot dot-janitor"></i>Janitor</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- DYNAMIC CENTER ANNOUNCEMENT BANNER -->
+    <div id="announcement-banner" class="announcement-banner hidden">
+      <div class="announcement-title" id="announcement-title">PERFECT INTERCEPT!</div>
+      <div class="announcement-sub" id="announcement-sub">+500 PTS // GLUTE LOCK ACHIEVED</div>
+    </div>
+
+    <!-- BOTTOM HUD: CHAIR EVOLUTION MORPH & ABILITY HOTBAR -->
+    <footer id="hud-bottom" class="hud-hidden">
+      <div class="evolution-bar" id="hud-evolution-bar">
+        <!-- Populated dynamically by UI controller -->
+      </div>
+
+      <div class="ability-bar">
+        <div class="ability-slot" id="slot-move">
+          <kbd>WASD</kbd>
+          <span class="ability-name">Scoot / Roll</span>
+        </div>
+        <div class="ability-slot" id="slot-freeze">
+          <kbd>SPACE</kbd>
+          <span class="ability-name">Freeze Disguise / Hop</span>
+          <div class="cooldown-overlay" id="cd-freeze"></div>
+        </div>
+        <div class="ability-slot highlight-intercept" id="slot-dash">
+          <kbd>SHIFT</kbd>
+          <span class="ability-name">Slide-Intercept</span>
+          <div class="cooldown-overlay" id="cd-dash"></div>
+        </div>
+        <div class="ability-slot" id="slot-sabotage">
+          <kbd>E</kbd>
+          <span class="ability-name">Sabotage Rival</span>
+          <div class="cooldown-overlay" id="cd-sabotage"></div>
+        </div>
+        <div class="ability-slot mode-toggle-slot" id="slot-mode">
+          <kbd>Q</kbd>
+          <span class="ability-name" id="slot-mode-label">Mode: Siphon</span>
+        </div>
+        <div class="ability-slot special-slot" id="slot-special">
+          <kbd>R</kbd>
+          <span class="ability-name" id="slot-special-label">Whoopee Blast</span>
+          <div class="cooldown-overlay" id="cd-special"></div>
+        </div>
+        <button id="btn-open-workshop-hud" class="hud-btn" title="Open Chair Evolution Workshop (Tab)">
+          <kbd>TAB</kbd> Evolutions
+        </button>
+        <button id="btn-pause-hud" class="hud-btn" title="Pause / Stage Select (Esc)">
+          <kbd>ESC</kbd> Menu
+        </button>
+      </div>
+    </footer>
+
+    <!-- MAIN MENU / STAGE SELECT OVERLAY -->
+    <section id="main-menu-modal" class="modal-overlay">
+      <div class="menu-container">
+        <div class="hero-header">
+          <div class="eyebrow-tag">AAA SENTIENT FURNITURE STEALTH &amp; PHYSICS SANDBOX</div>
+          <h1 class="game-title">SIT ON ME<span>.</span></h1>
+          <p class="game-subtitle">
+            You are a sentient, hyper-ambitious chair. Sneak behind humans when they aren't looking, sabotage inferior rival furniture, slide-intercept descending glutes at the last millisecond, or catapult VIPs across the room.
+          </p>
+        </div>
+
+        <!-- CAMPAIGN LEVEL CARDS -->
+        <div class="section-heading-row">
+          <h3>SELECT CAMPAIGN OPERATION</h3>
+          <div class="menu-top-actions">
+            <span class="gold-pill" id="menu-coins-display">0 🪙 Glute Gold</span>
+            <button id="btn-open-workshop-menu" class="secondary-cta">🛠️ Chair Evolution Workshop</button>
+            <button id="btn-toggle-audio" class="icon-btn">🔊 Audio: ON</button>
+          </div>
+        </div>
+
+        <div id="campaign-grid" class="campaign-grid">
+          <!-- Populated dynamically with the 4 Campaign Levels + Endless Chaos Mode -->
+        </div>
+
+        <!-- MECHANICS QUICK-GUIDE -->
+        <div class="mechanics-grid">
+          <div class="mech-card">
+            <div class="mech-icon">👁️</div>
+            <div>
+              <h4>1. Red Light, Green Light</h4>
+              <p>Humans freak out if they see a chair walking! Watch their floor vision cones and hold <kbd>SPACE</kbd> to freeze as an innocent piece of furniture.</p>
+            </div>
+          </div>
+          <div class="mech-card">
+            <div class="mech-icon">🎯</div>
+            <div>
+              <h4>2. Last-Second Intercepts</h4>
+              <p>When a human lowers down to sit (golden ring), hit <kbd>SHIFT</kbd> to turbo-slide right beneath their glutes for a massive <b>Perfect Catch</b> multiplier!</p>
+            </div>
+          </div>
+          <div class="mech-card">
+            <div class="mech-icon">🔧</div>
+            <div>
+              <h4>3. Rival Chair Sabotage</h4>
+              <p>Press <kbd>E</kbd> near ordinary chairs to unscrew their legs! Humans who try sitting on broken rivals collapse—or fall straight into your waiting cushion.</p>
+            </div>
+          </div>
+          <div class="mech-card">
+            <div class="mech-icon">🚀</div>
+            <div>
+              <h4>4. Morph, Siphon &amp; Catapult</h4>
+              <p>Evolve from a Café Stool to a Gaming Chair, Recliner, or Royal Throne (<kbd>1</kbd>-<kbd>5</kbd>). Toggle <kbd>Q</kbd>/<kbd>R</kbd> to launch sitters into patrolling Janitors!</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CHAIR EVOLUTION & UPGRADE WORKSHOP MODAL -->
+    <section id="workshop-modal" class="modal-overlay hidden">
+      <div class="workshop-container">
+        <div class="modal-top-bar">
+          <div>
+            <span class="eyebrow-tag">FURNITURE R&amp;D LAB</span>
+            <h2>CHAIR EVOLUTION &amp; CHASSIS UPGRADES</h2>
+          </div>
+          <div class="modal-top-right">
+            <span class="gold-pill" id="workshop-coins-display">0 🪙 Glute Gold</span>
+            <button id="btn-close-workshop" class="primary-cta">Back to Action</button>
+          </div>
+        </div>
+
+        <div class="workshop-layout">
+          <div class="workshop-section">
+            <h3>CHASSIS EVOLUTIONS (Hot-Swap in Mission with Keys 1–5)</h3>
+            <div id="evolutions-list" class="evolutions-grid"></div>
+          </div>
+          <div class="workshop-section">
+            <h3>STAT TUNING &amp; GADGETS</h3>
+            <div id="upgrades-list" class="upgrades-list"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STAGE COMPLETE / GAME OVER MODAL -->
+    <section id="result-modal" class="modal-overlay hidden">
+      <div class="result-card">
+        <div class="eyebrow-tag" id="result-eyebrow">OPERATION DEBRIEF</div>
+        <h2 id="result-title">STAGE COMPLETE!</h2>
+        <p id="result-subtitle">Every posterior in the room has known your lumbar support.</p>
+
+        <div class="result-stats-grid" id="result-stats-grid"></div>
+
+        <div class="result-actions">
+          <button id="btn-result-next" class="primary-cta">Next Operation →</button>
+          <button id="btn-result-workshop" class="secondary-cta">🛠️ Evolution Workshop</button>
+          <button id="btn-result-retry" class="secondary-cta">Replay Stage</button>
+          <button id="btn-result-menu" class="secondary-cta">Campaign Map</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
