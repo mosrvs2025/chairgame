@@ -54,3 +54,28 @@ Build for production:
 ```bash
 npm run build
 ```
+
+
+## Phone & tablet controls
+
+The game supports portrait and landscape touch play. Drag the left thumbstick to scoot; you can hold it with one thumb while using abilities with the other.
+
+- **FREEZE**: hold to disguise yourself; tap while moving to hop.
+- **DASH**: turbo slide toward a golden sit target (cooldown shown on button).
+- **SABOTAGE**: break a nearby rival chair.
+- **SPECIAL**: activate the current chair's special ability.
+- **SIPHON / CATAPULT**: tap to switch mode; becomes **LAUNCH** when occupied.
+- **Evolutions**: open the workshop to unlock and equip every chassis by touch.
+- **Pause**: stop the mission and resume without restarting it. Switching apps also pauses and clears held input.
+
+Touch controls appear on phones, tablets, touch laptops, and windows up to 900px wide. Safe-area insets and dynamic viewport height keep controls clear of browser chrome. Mobile uses a capped 1.25 pixel ratio and 1024px shadow maps.
+
+## Browser regression tests
+
+```
+npm ci
+npm test
+npm run build
+```
+
+Tests require Google Chrome installed (`channel: chrome`). The suite starts its own Vite server and covers real browser touch events, simultaneous thumbstick/ability input, release/cancellation, freeze, dash, sabotage, special, harvesting, catapulting, evolution purchases/equipping, pause/resume, and desktop keyboard controls. Layouts cover 320×568, 390×844, 844×390 landscape, and 768×1024. Device emulation does not replace performance testing on physical iOS/Android hardware.

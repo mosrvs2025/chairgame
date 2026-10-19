@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { TouchControls } from './input/TouchControls.js';
 import { CHAIR_EVOLUTIONS, WORKSHOP_UPGRADES, CAMPAIGN_LEVELS } from './data/GameData.js';
 import { SoundEngine } from './audio/SoundEngine.js';
 import { ChairPlayer } from './entities/ChairPlayer.js';
@@ -9,6 +10,7 @@ import { ArenaBuilder } from './world/ArenaBuilder.js';
 class ChairGameApp {
   constructor() {
     this.canvas = document.getElementById('three-canvas');
+    this.mobileDevice = navigator.maxTouchPoints > 0 || matchMedia('(max-width: 900px)').matches;
     this.radarCanvas = document.getElementById('radar-canvas');
     this.radarCtx = this.radarCanvas.getContext('2d');
     this.labelsContainer = document.getElementById('world-labels-container');
@@ -28,11 +30,11 @@ class ChairGameApp {
 
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
-      antialias: true,
+      antialias: !this.mobileDevice,
       powerPreference: 'high-performance'
     });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.mobileDevice ? 1.25 : 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -52,7 +54,7 @@ class ChairGameApp {
     this.activeBadges = new Map();
 
     // Mission State
-    this.mode = 'menu'; // 'menu' | 'playing' | 'workshop' | 'result'
+    this.mode = 'menu'; // menu | playing | paused | workshop | result
     this.currentLevelIndex = 0;
     this.currentLevel = CAMPAIGN_LEVELS[0];
     this.arenaBounds = { w: 28, d: 24 };
@@ -68,6 +70,7 @@ class ChairGameApp {
 
     // Input State
     this.input = { keys: {} };
+    this.touch = new TouchControls(this.input, code => this.handleAction(code));
     this.bindEvents();
     this.buildMenuUI();
     this.updateWorkshopUI();
@@ -118,8 +121,8 @@ class ChairGameApp {
     this.dirLight = new THREE.DirectionalLight(0xffb347, 1.85);
     this.dirLight.position.set(12, 24, 14);
     this.dirLight.castShadow = true;
-    this.dirLight.shadow.mapSize.width = 2048;
-    this.dirLight.shadow.mapSize.height = 2048;
+    this.dirLight.shadow.mapSize.width = this.mobileDevice ? 1024 : 2048;
+    this.dirLight.shadow.mapSize.height = this.mobileDevice ? 1024 : 2048;
     this.dirLight.shadow.camera.near = 2;
     this.dirLight.shadow.camera.far = 60;
     const d = 22;
@@ -142,78 +145,26 @@ class ChairGameApp {
       this.renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    window.addEventListener('keydown', (e) => {
+    window.addEventListener('keydown', e => {
+      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.code) && this.mode === 'playing') e.preventDefault();
       this.input.keys[e.code] = true;
-
-      if (this.mode === 'playing') {
-        // Space tap while moving = Hop; Space hold = Disguise
-        if (e.code === 'Space' && !e.repeat) {
-          const speed = Math.hypot(this.player.vel.x, this.player.vel.z);
-          if (speed > 2.2 && this.player.hopY === 0 && !this.player.occupiedBy) {
-            this.player.hopVel = 7.2;
-            this.sound.playHop();
-          } else {
-            this.sound.playFreeze();
-          }
-        }
-
-        // E = Sabotage nearby Rival Chair
-        if (e.code === 'KeyE' && !e.repeat) {
-          this.trySabotageNearbyChair();
-        }
-
-        // Q = Toggle Siphon/Catapult Mode (or immediately Catapult current sitter!)
-        if (e.code === 'KeyQ' && !e.repeat) {
-          if (this.player.occupiedBy) {
-            this.executeCatapultOnActiveSitter();
-          } else {
-            this.player.trapMode = this.player.trapMode === 'siphon' ? 'catapult' : 'siphon';
-            this.updateTrapModeUI();
-            this.sound.playFreeze();
-          }
-        }
-
-        // R = Special Evolution Ability (or Catapult if occupied)
-        if (e.code === 'KeyR' && !e.repeat) {
-          if (this.player.occupiedBy) {
-            this.executeCatapultOnActiveSitter();
-          } else {
-            this.triggerChairSpecial();
-          }
-        }
-
-        // 1-5 Live Chair Evolution Morph
-        if (['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'].includes(e.code) && !e.repeat) {
-          const idx = parseInt(e.code.replace('Digit', ''), 10) - 1;
-          const evo = CHAIR_EVOLUTIONS[idx];
-          if (evo && this.saveData.unlockedForms.includes(evo.id)) {
-            this.equipChairForm(evo.id);
-          }
-        }
-
-        if (e.code === 'Tab') {
-          e.preventDefault();
-          this.openWorkshop();
-        }
-
-        if (e.code === 'Escape') {
-          this.showMainMenu();
-        }
-      } else if (this.mode === 'workshop' && (e.code === 'Escape' || e.code === 'Tab')) {
-        e.preventDefault();
-        this.closeWorkshop();
-      }
+      if (!e.repeat) this.handleAction(e.code);
     });
-
-    window.addEventListener('keyup', (e) => {
-      this.input.keys[e.code] = false;
+    window.addEventListener('keyup', e => { this.input.keys[e.code] = false; });
+    const suspend = () => { this.input.keys = {}; this.touch.clear(); this.pauseMission(); };
+    window.addEventListener('blur', suspend);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) suspend(); });
+    document.getElementById('btn-resume').addEventListener('click', () => this.resumeMission());
+    document.getElementById('btn-pause-menu').addEventListener('click', () => {
+      document.getElementById('pause-modal').classList.add('hidden');
+      this.showMainMenu();
     });
 
     // Buttons
     document.getElementById('btn-open-workshop-menu').addEventListener('click', () => this.openWorkshop());
     document.getElementById('btn-open-workshop-hud').addEventListener('click', () => this.openWorkshop());
     document.getElementById('btn-close-workshop').addEventListener('click', () => this.closeWorkshop());
-    document.getElementById('btn-pause-hud').addEventListener('click', () => this.showMainMenu());
+    document.getElementById('btn-pause-hud').addEventListener('click', () => this.pauseMission());
 
     const audioBtn = document.getElementById('btn-toggle-audio');
     audioBtn.addEventListener('click', () => {
@@ -235,6 +186,53 @@ class ChairGameApp {
     document.getElementById('btn-result-menu').addEventListener('click', () => {
       this.showMainMenu();
     });
+  }
+
+  handleAction(code) {
+    if (this.mode === 'paused' && code === 'Escape') return this.resumeMission();
+    if (this.mode === 'workshop' && (code === 'Escape' || code === 'Tab')) return this.closeWorkshop();
+    if (this.mode !== 'playing') return;
+    if (code === 'Space') {
+      if (Math.hypot(this.player.vel.x, this.player.vel.z) > 2.2 && this.player.hopY === 0 && !this.player.occupiedBy) {
+        this.player.hopVel = 7.2;
+        this.sound.playHop();
+      } else this.sound.playFreeze();
+    }
+    if (code === 'KeyE') this.trySabotageNearbyChair();
+    if (code === 'KeyQ') {
+      if (this.player.occupiedBy) this.executeCatapultOnActiveSitter();
+      else {
+        this.player.trapMode = this.player.trapMode === 'siphon' ? 'catapult' : 'siphon';
+        this.updateTrapModeUI();
+        this.sound.playFreeze();
+      }
+    }
+    if (code === 'KeyR') {
+      if (this.player.occupiedBy) this.executeCatapultOnActiveSitter();
+      else this.triggerChairSpecial();
+    }
+    if (/^Digit[1-5]$/.test(code)) {
+      const evo = CHAIR_EVOLUTIONS[Number(code.slice(-1)) - 1];
+      if (this.saveData.unlockedForms.includes(evo.id)) this.equipChairForm(evo.id);
+    }
+    if (code === 'Tab') this.openWorkshop();
+    if (code === 'Escape') this.pauseMission();
+  }
+
+  pauseMission() {
+    if (this.mode !== 'playing') return;
+    this.mode = 'paused';
+    this.input.keys = {};
+    this.touch.setEnabled(false);
+    document.getElementById('pause-modal').classList.remove('hidden');
+  }
+
+  resumeMission() {
+    if (this.mode !== 'paused') return;
+    this.mode = 'playing';
+    this.lastTime = performance.now();
+    document.getElementById('pause-modal').classList.add('hidden');
+    this.touch.setEnabled(true);
   }
 
   get upgrades() {
@@ -317,7 +315,9 @@ class ChairGameApp {
     this.sound.startMusic();
     this.loadStage(levelIndex, false);
     this.mode = 'playing';
-
+    this.input.keys = {};
+    this.touch.clear();
+    this.touch.setEnabled(true);
     document.getElementById('main-menu-modal').classList.add('hidden');
     document.getElementById('workshop-modal').classList.add('hidden');
     document.getElementById('result-modal').classList.add('hidden');
@@ -341,6 +341,8 @@ class ChairGameApp {
 
   showMainMenu() {
     this.mode = 'menu';
+    this.input && (this.input.keys = {});
+    this.touch?.setEnabled(false);
     document.getElementById('main-menu-modal').classList.remove('hidden');
     document.getElementById('workshop-modal').classList.add('hidden');
     document.getElementById('result-modal').classList.add('hidden');
@@ -352,6 +354,8 @@ class ChairGameApp {
   openWorkshop() {
     this.prevMode = this.mode === 'workshop' ? 'menu' : this.mode;
     this.mode = 'workshop';
+    this.input && (this.input.keys = {});
+    this.touch?.setEnabled(false);
     this.updateWorkshopUI();
     document.getElementById('workshop-modal').classList.remove('hidden');
   }
@@ -359,6 +363,7 @@ class ChairGameApp {
   closeWorkshop() {
     document.getElementById('workshop-modal').classList.add('hidden');
     this.mode = this.prevMode || 'menu';
+    this.touch.setEnabled(this.mode === 'playing');
     this.updateEvolutionBarUI();
   }
 
@@ -576,6 +581,8 @@ class ChairGameApp {
 
   completeStage(victory) {
     this.mode = 'result';
+    this.input && (this.input.keys = {});
+    this.touch?.setEnabled(false);
     if (victory) {
       this.sound.playVictory();
       const stageReward = 150 + this.currentLevelIndex * 90;
@@ -902,7 +909,7 @@ class ChairGameApp {
 
     if (janitorChasing || maxSuspicion > 0.7) {
       stealthBox.className = 'stealth-box state-danger';
-      stealthText.textContent = 'SPOTTED MOVING! HOLD [SPACE] TO FREEZE!';
+      stealthText.textContent = document.body.classList.contains('touch-layout') ? 'SPOTTED! HOLD FREEZE TO HIDE' : 'SPOTTED MOVING! HOLD [SPACE] TO FREEZE!';
     } else if (maxSuspicion > 0.15) {
       stealthBox.className = 'stealth-box state-caution';
       stealthText.textContent = 'HUMAN PERIPHERAL // FREEZE SOON';
@@ -957,7 +964,7 @@ class ChairGameApp {
           this.activeBadges.set(npc, badge);
         }
         const rem = Math.max(0, npc.loweringDuration - npc.loweringElapsed).toFixed(1);
-        badge.textContent = `🎯 SITTING IN ${rem}s! [SHIFT] INTERCEPT`;
+        badge.textContent = document.body.classList.contains('touch-layout') ? `🎯 ${rem}s · DASH TO CATCH!` : `🎯 SITTING IN ${rem}s! [SHIFT] INTERCEPT`;
         const worldPos = npc.pos.clone();
         worldPos.y += 2.45;
         const screen = this.projectToScreen(worldPos);
@@ -1050,6 +1057,7 @@ class ChairGameApp {
     requestAnimationFrame((t) => this.loop(t));
     const dt = Math.min(0.05, (now - this.lastTime) / 1000);
     this.lastTime = now;
+    if (document.hidden) return;
 
     if (this.mode === 'playing') {
       this.player.update(dt, this.input, this.arenaBounds, this.arena.obstacles, this.upgrades, this.sound);
@@ -1063,8 +1071,9 @@ class ChairGameApp {
       const shakeY = (Math.random() - 0.5) * this.cameraShake;
 
       const targetCamX = this.player.pos.x * 0.72 + shakeX;
-      const targetCamY = 14.5 + shakeY;
-      const targetCamZ = this.player.pos.z * 0.72 + 13.5;
+      const portrait = window.innerHeight > window.innerWidth;
+      const targetCamY = (portrait ? 18 : 14.5) + shakeY;
+      const targetCamZ = this.player.pos.z * 0.72 + (portrait ? 17 : 13.5);
 
       this.camera.position.x = THREE.MathUtils.lerp(this.camera.position.x, targetCamX, dt * 6);
       this.camera.position.y = THREE.MathUtils.lerp(this.camera.position.y, targetCamY, dt * 6);
@@ -1073,10 +1082,11 @@ class ChairGameApp {
 
       this.playerSpot.position.set(this.player.pos.x, 3.8, this.player.pos.z);
 
+      this.touch.update(this.player);
       this.updateRealtimeHUD(dt);
       this.updateWorldProjections(dt);
       this.renderRadar();
-    } else {
+    } else if (this.mode !== 'paused') {
       // Cinematic orbit camera in Menu / Workshop
       const angle = now * 0.00035;
       this.camera.position.set(Math.sin(angle) * 16, 11.5, Math.cos(angle) * 16);

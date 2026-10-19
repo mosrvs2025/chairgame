@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>CHAIRGAME // SIT ON ME — Tactical Sentient Furniture Action</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -166,23 +166,38 @@
         <button id="btn-open-workshop-hud" class="hud-btn" title="Open Chair Evolution Workshop (Tab)">
           <kbd>TAB</kbd> Evolutions
         </button>
-        <button id="btn-pause-hud" class="hud-btn" title="Pause / Stage Select (Esc)">
-          <kbd>ESC</kbd> Menu
+        <button id="btn-pause-hud" class="hud-btn" title="Pause mission (Esc)">
+          <kbd>ESC</kbd> Pause
         </button>
       </div>
     </footer>
 
+    <section id="touch-controls" aria-label="Touch game controls" hidden>
+      <p id="touch-tip">Drag to scoot · Hold FREEZE to hide · Catch golden sit rings</p>
+      <div id="touch-stick" role="group" aria-label="Movement thumbstick"><span id="touch-knob"></span><small>SCOOT</small></div>
+      <div class="touch-actions">
+        <button data-code="KeyE" data-hint="near rival" aria-label="Sabotage rival chair"><span>SABOTAGE</span><small>near rival</small></button>
+        <button data-code="KeyR" data-hint="lure / power" aria-label="Use special ability"><span>SPECIAL</span><small>lure / power</small></button>
+        <button data-code="KeyQ" aria-label="Toggle siphon or catapult"><span>SIPHON</span><small>tap to switch</small></button>
+        <button data-code="Space" class="touch-freeze" aria-label="Hold to freeze or hop"><span>FREEZE</span><small>hold to hide</small></button>
+        <button data-code="ShiftLeft" data-hint="slide intercept" class="touch-dash" aria-label="Dash and intercept"><span>DASH</span><small>slide intercept</small></button>
+      </div>
+    </section>
+    <section id="pause-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+      <div class="result-card"><div class="eyebrow-tag">SEAT RESERVED</div><h2 id="pause-title">Taking a breather.</h2><p>Your mission is paused.</p><div class="result-actions"><button id="btn-resume" class="primary-cta">Resume mission</button><button id="btn-pause-menu" class="secondary-cta">Campaign map</button></div></div>
+    </section>
     <!-- MAIN MENU / STAGE SELECT OVERLAY -->
     <section id="main-menu-modal" class="modal-overlay">
       <div class="menu-container">
         <div class="hero-header">
-          <div class="eyebrow-tag">AAA SENTIENT FURNITURE STEALTH &amp; PHYSICS SANDBOX</div>
+          <div class="eyebrow-tag">SENTIENT FURNITURE STEALTH &amp; PHYSICS SANDBOX</div>
           <h1 class="game-title">SIT ON ME<span>.</span></h1>
           <p class="game-subtitle">
             You are a sentient, hyper-ambitious chair. Sneak behind humans when they aren't looking, sabotage inferior rival furniture, slide-intercept descending glutes at the last millisecond, or catapult VIPs across the room.
           </p>
         </div>
 
+        <p class="touch-menu-guide">PHONE CONTROLS: Drag the left thumbstick to scoot. Hold FREEZE to hide. Dash into a golden sit ring, then stay still to harvest. Tap SPECIAL to lure sitters, SABOTAGE near a rival chair, or LAUNCH when occupied. Evolutions opens the upgrade workshop.</p>
         <!-- CAMPAIGN LEVEL CARDS -->
         <div class="section-heading-row">
           <h3>SELECT CAMPAIGN OPERATION</h3>

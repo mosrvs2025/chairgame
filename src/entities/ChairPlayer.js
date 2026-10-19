@@ -298,7 +298,8 @@ export class ChairPlayer {
     }
 
     // Check Freeze / Disguise Pose (Hold Space when not moving or explicitly holding Space)
-    this.isFrozenDisguise = Boolean(input.keys['Space']) && !this.isDashing;
+    const held = code => input.keys[code] || input.touchKeys?.[code];
+    this.isFrozenDisguise = Boolean(held('Space')) && !this.isDashing;
 
     // Hide sentient eyes when frozen in disguise or occupied!
     if (this.eyesGroup) {
@@ -315,6 +316,8 @@ export class ChairPlayer {
     let ix = 0;
     let iz = 0;
     if (!this.isFrozenDisguise && !this.occupiedBy) {
+      ix = input.move?.x || 0;
+      iz = input.move?.z || 0;
       if (input.keys['KeyW'] || input.keys['ArrowUp']) iz -= 1;
       if (input.keys['KeyS'] || input.keys['ArrowDown']) iz += 1;
       if (input.keys['KeyA'] || input.keys['ArrowLeft']) ix -= 1;
@@ -322,18 +325,18 @@ export class ChairPlayer {
     }
 
     const inputLen = Math.hypot(ix, iz);
-    if (inputLen > 0) {
+    if (inputLen > 1) {
       ix /= inputLen;
       iz /= inputLen;
     }
 
     // Trigger Last-Second Slide-Intercept Dash (Shift)
-    if ((input.keys['ShiftLeft'] || input.keys['ShiftRight']) && this.dashCooldown <= 0 && !this.occupiedBy) {
+    if ((held('ShiftLeft') || held('ShiftRight')) && this.dashCooldown <= 0 && !this.occupiedBy) {
       this.isDashing = true;
       this.dashTimer = 0.26;
       this.dashCooldown = 1.15;
-      const dirX = inputLen > 0 ? ix : Math.sin(this.yaw);
-      const dirZ = inputLen > 0 ? iz : Math.cos(this.yaw);
+      const dirX = inputLen > 0 ? ix / Math.min(inputLen, 1) : Math.sin(this.yaw);
+      const dirZ = inputLen > 0 ? iz / Math.min(inputLen, 1) : Math.cos(this.yaw);
       this.vel.x = dirX * dashSpeed;
       this.vel.z = dirZ * dashSpeed;
       sound.playDash();
